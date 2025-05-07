@@ -8,7 +8,7 @@
 #include "print.h"
 #include "rank.h"
 #include "sort.h"
-
+#include <math.h>
 #define RANK(A) ((A).rank)
 #define SMALLER(A, B) (RANK (A) < RANK (B))
 
