@@ -40,16 +40,37 @@ void kissat_rescale_scores (kissat *solver) {
                 factor);
 }
 
-void kissat_bump_score_increment (kissat *solver) {
-  const double old_scinc = solver->scinc;
-  const double decay = GET_OPTION (decay) * 1e-3;
-  assert (0 <= decay), assert (decay <= 0.5);
-  const double factor = 1.0 / (1.0 - decay);
-  const double new_scinc = old_scinc * factor;
-  LOG ("new score increment %g = %g * %g", new_scinc, factor, old_scinc);
-  solver->scinc = new_scinc;
-  if (new_scinc > MAX_SCORE)
-    kissat_rescale_scores (solver);
+void kissat_bump_score_increment(kissat *solver) {
+    const double old_scinc = solver->scinc;
+    const double base_decay = GET_OPTION(decay) * 1e-3;
+    assert(0 <= base_decay);
+    assert(base_decay <= 0.5);
+
+    const double ratio = old_scinc / MAX_SCORE;
+    double dynamic_decay;
+
+    if (ratio < 0.5) {
+        dynamic_decay = base_decay * (0.5 + ratio);
+    } else {
+        const double squared_ratio = ratio * ratio;
+        const double tanh_val = tanh(ratio);
+        dynamic_decay = base_decay * (0.475 * squared_ratio + 0.135 * (1.0 + tanh_val));
+    }
+
+    dynamic_decay = MIN(dynamic_decay, 0.5);
+
+    const double log_term = log(2.0 - dynamic_decay);
+    const double compensation = 1.0 + 0.15 * dynamic_decay;
+    const double factor = 1.0 / (1.0 - dynamic_decay * (log_term + compensation));
+
+    const double new_scinc = old_scinc * factor;
+    LOG("new score increment %g = %g * %g (decay:%.3f)", 
+        new_scinc, factor, old_scinc, dynamic_decay);
+    solver->scinc = new_scinc;
+    
+    if (new_scinc > MAX_SCORE) {
+        kissat_rescale_scores(solver);
+    }
 }
 
 static inline void bump_analyzed_variable_score (kissat *solver,
